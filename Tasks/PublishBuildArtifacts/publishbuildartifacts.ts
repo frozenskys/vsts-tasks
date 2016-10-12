@@ -6,6 +6,11 @@ import tr = require('vsts-task-lib/toolrunner');
 
 // used for escaping file paths that are passed into the powershell command
 let pathToPSString = (filePath: string) => {
+    // 1) Remove double quotes. Downstream logic in the Invoke-Robocopy.ps1 script
+    //    relies on the assumption that double-quotes do not exist in the paths.
+    // 2) Double-up single quotes. This is required to escape single quotes within
+    //    a single-quoted string in powershell.
+    // 3) Enclose in single quotes. This is to create a single-quoted string in powershell.
     let result: string =
         filePath.replace(/"/g, '') // remove double quotes
         .replace(/'/g, "''"); // double-up single quotes

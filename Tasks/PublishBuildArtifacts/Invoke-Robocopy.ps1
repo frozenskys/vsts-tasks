@@ -32,6 +32,41 @@ $writer = New-Object System.IO.StreamWriter($stdout, $utf8)
 # All subsequent output must be written using [System.Console]::WriteLine(). In
 # PowerShell 4, Write-Host and Out-Default do not consider the updated stream writer.
 
+# Fixup the $Source and $Target due to a robocopy quirk with trailing backslashes.
+#
+# According to http://ss64.com/nt/robocopy.html:
+#   If either the source or desination are a "quoted long foldername" do not include a
+#   trailing backslash as this will be treated as an escape character, i.e. "C:\some path\"
+#   will fail but "C:\some path\\" or "C:\some path\." or "C:\some path" will work.
+#
+# Furthermore, PowerShell implicitly double-quotes arguments to external commands only when the
+# argument contains unquoted spaces.
+#
+# So we need to fixup trailing spaces when both: A) the path contains a space AND B) the path
+# ends with a single backslash.
+#
+# Note, any spaces in the path will always be unquoted in this scenario. The upstream logic in
+# publishbuildartifacts.ts explicitly removes double-quotes from the paths.
+#
+# Note, details on PowerShell quoting rules for external commands can be found in the
+# source code here:
+# https://github.com/PowerShell/PowerShell/blob/v0.6.0/src/System.Management.Automation/engine/NativeCommandParameterBinder.cs
+function Update-PathArgument {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path)
+
+    # Test whether the path contains a space and ends with a single backslash.
+    if ($Path -like '* *\' -and $Path[-2] -ne '\') {
+        return "$Path\"
+    }
+
+    return $Path
+}
+$Source = Update-PathArgument -Path $Source
+$Target = Update-PathArgument -Path $Target
+
 # Print the ##command.
 [System.Console]::WriteLine("##[command]robocopy.exe /E /COPY:DA /NP /R:3 `"$Source`" `"$Target`" *")
 
